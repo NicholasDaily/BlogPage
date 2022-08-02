@@ -1,0 +1,82 @@
+#wrapper{
+  font-family: 'Old Standard TT', serif;
+}
+
+.entry{
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  justify-content: space-between;
+  align-items: stretch;
+  border-bottom: solid 1px grey;
+  font-size: 18px;
+}
+
+.date-duration{
+  flex-basis: 20%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-right: solid 1px black;
+ font-size: 15px;
+}
+
+.date{
+  font-weight: bold;
+}
+
+.no-description{
+  font-weight: bold;
+  color: silver;
+  justify-content: center;
+  align-self: center;
+  text-align: center;
+}
+
+.description{
+  margin: 20px;
+}
+
+.description-tags{
+  flex-basis: 80%;
+}
+
+.tag{
+  color: #0096FF;  
+}
+
+.tag::after{
+  content: " ";
+}
+
+#date-control-text{
+  font-weight: bold;
+  text-align: center;
+
+}
+
+#date-control-text a{
+  display: inline;
+  text-decoration: none;
+  color: white;
+}
+
+.date-button{
+  background: #0096FF;
+  color: white;
+  font-size: 25px;
+  padding: 5px;  
+}
+
+.date-button:hover{ 
+  cursor: pointer;
+}
+
+#log-headers > *{
+  text-align: center;
+  color: black;
+  font-size: 20px;
+  font-weight: bold;
+}
+

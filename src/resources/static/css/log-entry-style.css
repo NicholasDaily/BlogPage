@@ -1,0 +1,62 @@
+#log-form{
+  background: white;
+  border-radius: 5px;
+  padding: 5px;
+  overflow: auto;
+  color: #0F52BA;
+  font-weight: bold;
+}
+
+#log-form textarea:focus{
+  outline: none;
+}
+
+#main-form-container{
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-start;
+  align-items: stretch;
+  align-content: stretch;
+  column-gap: 5px;
+
+}
+
+#log-form textarea{
+  height: 100px;
+  width: 100%;
+  scroll-y: hidden;
+  resize: none;
+}
+
+#description-container{
+  flex-grow: 3;
+}
+
+#description-container label{
+  display: block;
+}
+
+#log-description{}
+
+#tag-container{
+  flex-grow: 1;
+}
+
+#tag-container label{ 
+  display: block;
+}
+
+
+#tag-text{}
+
+#bottom{
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  align-content: space-between;
+}
+
+.hidden{
+    display: none;
+}

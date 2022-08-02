@@ -1,0 +1,38 @@
+
+.progress-bar{
+	display: block;
+	width: 100%;
+	background: whitesmoke;
+	border: solid 3px black;
+	border-radius: 15px;
+	height: 15px;
+}
+
+.date {
+	float: right;
+}
+
+.event {
+	float: left;
+}
+
+.clear-fix{
+	width: 100%;
+	after: " ";
+	display: table;
+	clear: both;
+}
+
+.progress{
+	background: orange;
+	height: 10px;
+	border-radius: 15px;
+}
+
+.progress-wrapper{
+	width: 100%;
+	overflow: hidden;
+	padding-top: 2px;
+	padding-bottom: 2px;
+	height: 20px;
+}

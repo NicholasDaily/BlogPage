@@ -1,0 +1,47 @@
+<!DOCTYPE HTML>
+<html>
+
+<head>
+        <title>Projects</title>
+        <link href="https://fonts.googleapis.com/icon?family=Material+Icons"
+      rel="stylesheet">
+        <link type="text/css" rel="stylesheet" href="css/main-style.css">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <base target="_blank">
+</head>
+
+<body>
+	<header class="max-width-container">
+	</header>
+    <div id="wrapper" class="max-width-container">
+	    <section id="posts">
+	    	<div class="post">
+	    		<h1>Download links</h1>
+	    	</div>
+	    </section>
+    </div>
+    <script type="text/javascript" src="scripts/header.js"></script>
+    <script type="text/javascript">
+    	request = new XMLHttpRequest();
+    	request.open("GET", "/getDownloads");
+    	request.send();
+    	request.onreadystatechange = function(){
+    		if(request.readyState === 4 && request.status === 200){
+    			console.log(JSON.parse(request.response));
+    			displayDownloads(JSON.parse(request.response));
+    		}
+    	}
+    	postsAppendPoint = document.querySelector(".post");
+    	function displayDownloads(response){
+    		links = response.links;
+    		
+    		for(i = 0; i < links.length; i++){
+    			a = document.createElement("a");
+    			a.href = links[i];
+    			a.innerText = links[i].split("=")[1];
+    			postsAppendPoint.appendChild(a);
+    		}
+    	}
+    </script>
+</body>
+</html>

@@ -1,0 +1,242 @@
+<!DOCTYPE HTML>
+<html>
+
+<head>
+	<title>Projects</title>
+	<link href="https://fonts.googleapis.com/icon?family=Material+Icons"
+      rel="stylesheet">
+	<link type="text/css" rel="stylesheet" href="css/main-style.css">
+	<link type="text/css" rel="stylesheet" href="css/post-entry.css">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<base target="_self">
+</head>
+
+<body>
+
+	<header class="max-width-container">
+	</header>
+	
+	<div id="wrapper" class="max-width-container">
+		<div id="post-entry">
+			<form id="post-form" class="hidden" method="POST" enctype="multipart/form-data">
+				
+				<textarea id="post-text" name="post-text" placeholder="Post text..."></textarea>
+				
+				<label for="upload-image"><span class="material-icons">image</span></label>
+				<input type="file" id="upload-image" name="upload-image" accept=".jpg, .png, .gif" multiple onchange="readURL(this);">
+				<label for="upload-file"><span class="material-icons">attach_file</label>
+				<input type="file" id="upload-file" name="upload-file" multiple onchange="listFiles(this);">
+				<input type="submit" value="Post">
+				<div id="file-list">
+				
+				</div>
+				<div id="img-preview">
+				
+				</div>
+				<script>
+					var fileList = [];
+					var imageList = [];
+					var formElement = document.getElementById("post-form");
+					
+					formElement.addEventListener('submit', function(event){
+						var formData = new FormData(formElement);
+						event.preventDefault();
+						
+						sendData(formData);
+						
+					});
+					
+					function sendData(formData){
+						
+						var request = new XMLHttpRequest();
+						request.open("POST", "/validatePost");
+						request.send(formData);
+						
+						request.onreadystatechange = function(){
+							if(request.readyState === 4){
+								if(request.status === 200){
+									var parser = new DOMParser();
+									response = parser.parseFromString(request.response, "text/html").documentElement;
+									chill = response.children;
+									var realResponse;
+									for(var i = 0; i < chill.length; i++){
+										if(chill[i].tagName==="BODY")
+											realResponse = chill[i].children[0];
+									}
+									oldImage = document.getElementById("upload-image");
+									oldFile = document.getElementById("upload-file");
+									oldImage.parentNode.replaceChild(oldImage.cloneNode(), oldImage);
+									oldFile.parentNode.replaceChild(oldFile.cloneNode(), oldFile);
+									document.getElementById("posts").prepend(realResponse);
+									document.getElementById("post-text").value = "";
+									document.getElementById("file-list").innerHTML = "";
+									document.getElementById("img-preview").innerHTML = "";
+									
+									
+									
+								}
+								}else{
+									console.log("Error: " + request.status);
+								}
+						}
+					}
+					
+					function readURL(input){
+						placeHere = document.getElementById("img-preview");
+						if(input.files.length > 0)
+							placeHere.innerHTML = "<p><strong>Images Selected:</strong></p>";
+						else
+							placeHere.innerHTML = "";
+						
+						
+						for(const file of input.files){
+							img = document.createElement("img");
+							img.src = URL.createObjectURL(file);
+							placeHere.appendChild(img);
+						}
+						fileList = [];
+						for(var i = 0; i < input.files.length; i++){
+							fileList.push(input.files[i]);
+						}
+						console.log(fileList);
+					}
+					
+					function listFiles(input){
+						placeHere = document.getElementById("file-list");
+						if(input.files.length > 0)
+							placeHere.innerHTML = "<p><strong>Files Selected:</strong></p>";
+						else
+							placeHere.innerHTML = "";
+						list = document.createElement("p");
+						
+						for(i = 0; i < input.files.length; i++){
+							console.log(input.files[i].name);
+							list.innerHTML += input.files[i].name;
+							if(i < input.files.length - 1){
+								list.innerHTML += ", ";
+							}
+						}
+						imageList = [];
+						placeHere.appendChild(list);
+						for(var i = 0; i < input.files.length; i++){
+							imageList.push(input.files[i]);
+						}
+						console.log(imageList);
+					}
+				
+				
+				</script>
+			</form>
+		</div>
+		<section id="posts">
+
+		</section>
+		
+		
+	</div>
+	<script type="text/javascript">
+		ajaxReady = true;
+		var body;
+		window.onload = function(){
+			body = document.querySelector("body");
+			body.onscroll = loadPosts;
+			loadPosts();
+		}
+		function loadPosts(){
+			scrollDistance = window.scrollY;
+			maxScroll = body.clientHeight - window.innerHeight - 30;
+			if(scrollDistance > maxScroll){
+				if(ajaxReady){
+					var str = "";
+					post_container = document.getElementById("posts");
+					posts = post_container.children;
+					if(posts.length > 0){
+						nodes = posts[posts.length - 1].children;
+						var postID;
+						for(i = 0; i < nodes.length; i++){
+							if(nodes[i].classList.contains("post_id"))
+								postID = nodes[i].id;
+						}
+						str = "has_posts=true&post_id=" + postID;
+						
+					}else{
+						str = "has_posts=false"
+					}
+					request = new XMLHttpRequest();
+					request.open("GET", "/getPosts?" + str + "&post_limit=5");
+					request.send();
+					ajaxReady = false;
+					request.onreadystatechange = function(){
+						if(request.readyState === 4){
+							if(request.status === 200){
+								if(request.response.length > 0){
+									var response = JSON.parse(request.response);
+									displayPosts(response);
+								}
+							}
+						}
+						ajaxReady = true;
+					}
+				}
+				
+			}
+		}
+		
+		function displayPosts(json_code){
+			for(i = 0; i < json_code.length; i++){
+				post = document.createElement("div");
+				post.classList.add("post");
+				postID = document.createElement("p");
+				postID.innerHTML= "#" + json_code[i].PostID;
+				postID.classList.add("post_id");
+				postID.id = json_code[i].PostID;
+				post.appendChild(postID);
+				
+				postItems = json_code[i].items;
+				
+				for(j = 0; j < postItems.length; j++){
+					if(postItems[j].type === 1){
+						itemToAppend = document.createElement("pre");
+						itemToAppend.innerHTML = htmlEntities(postItems[j].content);
+						post.appendChild(itemToAppend);
+					}else if(postItems[j].type === 2){
+						itemToAppend = document.createElement("img");
+						itemToAppend.src = postItems[j].content;
+						post.appendChild(itemToAppend);
+					}else if(postItems[j].type === 3){
+						itemToAppend = document.createElement("a");
+						itemToAppend.innerHTML = postItems[j].content;
+						itemToAppend.href = postItems[j].content;
+						post.appendChild(itemToAppend);
+					}
+				}
+				document.getElementById("posts").appendChild(post);
+			}
+		}
+		
+		loggedIn = new XMLHttpRequest();
+            loggedIn.open("Get", "/userLoggedIn" + window.location.search);
+            loggedIn.send();
+            loggedIn.onreadystatechange = function(){
+                if(loggedIn.readyState === 4 && loggedIn.status === 200){
+                    document.querySelector(".hidden").classList.remove("hidden");
+                }
+            }
+            
+            function addCss(fileName){
+            	var head = document.head;
+            	var link = document.createElement("link");
+            	link.type = "text/css";
+            	link.rel = "stylesheet";
+            	link.href = fileName;
+            	head.appendChild(link);
+            }
+		
+	function htmlEntities(str) {
+    		return str.replaceAll("&", '&amp;').replaceAll("<", '&lt;').replaceAll(">", '&gt;').replaceAll('"', '&quot;');
+	}
+	
+	</script>
+<script type="text/javascript" src="scripts/header.js"></script>
+</body>
+</html>

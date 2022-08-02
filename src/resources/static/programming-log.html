@@ -1,0 +1,334 @@
+<?php
+        session_start(); 
+        require 'sql-connect.php';
+	$version_number = "1-0-2";
+?>
+<!DOCTYPE HTML>
+<html>
+
+<head>
+        <title>Projects</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link href="https://fonts.googleapis.com/css2?family=Old+Standard+TT&display=swap" rel="stylesheet">
+    <link type="text/css" rel="stylesheet" href="css/main-style.css?version=1-0-2">
+	<link type="text/css" rel="stylesheet" href="css/log-style.css?version=1-0-2">
+	<link type='text/css' rel='stylesheet' href='css/log-entry-style.css?version=1-0-2'>
+	<script type="text/javascript" src="pay-status.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <base target="_blank">
+</head>
+
+<body>
+    <header class="max-width-container">
+    </header>
+
+    <div id="wrapper" class="max-width-container">
+		<div id="log-entry" class="hidden">
+	<form id="log-form" method="POST" enctype="multipart/form-data" action="log-validation.php">
+		<h3>Log entry: <span id="log-update-date"><?php echo date("Y-m-d"); ?></span></h3>
+		<div id="main-form-container">
+			<div id="description-container">
+				<label for="log-description">Description:</label>
+				<textarea id="log-description" name="log-description" placeholder="Description of programming session..."></textarea>
+			</div>
+			<div id="tag-container">
+				<label for="tag-text">Tags:</label>
+				<textarea id="tag-text" name="tag-text" placeholder="#BackEndDev #sql #tags"></textarea>
+			</div>
+		</div>
+		<div id="bottom">
+			<label for="hours">Hours: </label>
+			<input type="text" id="hours" name="hours" value="0.00">
+			<p id="rate">rate: &pound;12.00</span>
+			<p id="log-total">Total: &pound;<span id="log-total-value">0.00</span></p>
+			<input type="submit" value="POST">
+		</div>
+		<script>
+			var formElement = document.getElementById("log-form");
+			formElement.addEventListener('submit', function(event){
+				var formData = new FormData(formElement);
+				event.preventDefault();
+				sendData(formData);
+				
+			});
+
+			var logDate = document.getElementById("log-update-date");
+
+			function sendData(formData){
+				var logDateText = logDate.innerText;
+				var request = new XMLHttpRequest();
+				request.open("POST", "/logEntryValidation");
+				formData.append("entry-date", logDateText);
+				request.send(formData);
+				
+				request.onreadystatechange = function(){
+					if(request.readyState === 4){
+						if(request.status === 200){
+							console.log(request.response);
+							document.getElementById("log-description").value = "";
+							document.getElementById("tag-text").value = "";
+							document.getElementById("hours").value = "0.00";
+						}
+						}else{
+							console.log("Error: " + request.status);
+						}
+				}
+			}
+			var hours = document.getElementById("hours");
+			hours.addEventListener('keyup', updateTotal);
+
+			function updateTotal(){
+				numhours = parseFloat(hours.value);
+				document.getElementById("log-total-value").innerText = 12.00 * numhours;
+			}
+
+
+			function updateLog(date, element){
+				logDate.innerText = date;
+				logElements = element.parentNode.childNodes;
+				var duration;
+				var description;
+				var tags = "";
+				for(i = 0; i < logElements.length; i++){
+					if(logElements[i].classList == undefined) continue;
+					if(logElements[i].classList.contains("date-duration")){
+						dateDuration = logElements[i].childNodes;
+						for(j = 0; j < dateDuration.length; j++){
+							if(dateDuration[j].classList == undefined) continue;
+							if(dateDuration[j].classList.contains("duration"))
+								duration = dateDuration[j].innerText.replace('hrs', '');
+						}
+					}
+					if(logElements[i].classList.contains("description-tags")){
+						descriptionTags = logElements[i].childNodes;
+						for(j = 0; j < descriptionTags.length; j++){
+							if(descriptionTags[j].classList == undefined) continue;
+							if(descriptionTags[j].classList.contains("description"))
+								description = descriptionTags[j].innerText;
+							if(descriptionTags[j].classList.contains("tags")){
+								tagsContainer = descriptionTags[j].childNodes;
+								for(k = 0; k < tagsContainer.length; k++){
+									tags += tagsContainer[k].innerText + " ";
+								}
+							}
+						
+						}
+					}
+				}
+				document.getElementById("log-description").value = description;
+				document.getElementById("tag-text").value = tags;
+				document.getElementById("hours").value = duration;
+			}
+
+
+		</script>
+	</form>
+</div>
+
+		<section id="posts">
+            <div class="post">
+	            <div id="entry-container">
+                    <section id="log-headers" class="entry">
+                        <div class="date-duration">date/hours</div>
+                        <div class="description-tags">description/tags</div>
+                    </section>
+			
+				</div>
+				<div id="log-totals">
+				<p id="hours-total"><strong>Week hours total:</strong> </p>
+				</div>
+				<div id="date-control">
+
+				<div id="date-control-text">
+					<a target="_self"  id="previous-week" class="date-button"><</a>
+					<span></span>
+					<a target="_self" id="next-week" class="date-button">></a></div>
+				</div> 
+			</div>
+		</section>
+	</div>
+    <script type="text/javascript">
+            
+            request = new XMLHttpRequest();
+            request.open("Get", "/getLogEntries" + window.location.search);
+            request.send();
+            request.onreadystatechange = function(){
+                if(request.readyState === 4 && request.status === 200){
+                    displayEntries(JSON.parse(request.response));
+                }
+            }
+            
+            
+            
+            
+            function setNextPrevLinks(currentDate){
+                next = document.getElementById("next-week");
+                previous = document.getElementById("previous-week");
+                
+                tempDate = currentDate;
+                console.log(tempDate);
+                document.querySelector("#date-control-text > span").innerText = currentDate.toISOString().split('T')[0];
+                tempDate.setDate(tempDate.getDate() + 7);
+                next.href = "programming-log.html?date=" + tempDate.toISOString().split('T')[0];
+                tempDate.setDate(tempDate.getDate() - 14);
+                previous.href = "programming-log.html?date=" + tempDate.toISOString().split('T')[0];
+            }
+            
+            function displayEntries(entries){
+                appendPoint = document.getElementById("entry-container");
+                dateSections = entries[0].date.split('-')
+                currentDate = new Date(dateSections[2] + '-' + dateSections[1] + '-' + dateSections[0]);
+                setNextPrevLinks(currentDate);
+                hoursTotal = 0.0;
+                rate = 12.0;
+                displayAllTotals = false;
+                allPayComplete = true;
+                payAmountTotal = 0.0;
+                userLoggedIn = false;
+                for(var i = 0; i < entries.length; i++){
+                    entry = entries[i];
+                    entryContainer = document.createElement("section");
+                    entryContainer.classList.add("entry");
+                    date_duration = document.createElement("div");
+                    date_duration.classList.add("date-duration")
+                    date = document.createElement("p");
+                    date.classList.add("date");
+                    date.innerText = entry.date;
+                    date_duration.appendChild(date);
+                    duration = document.createElement("p");
+                    duration.classList.add("duration");
+                    hoursTotal += entry.duration;
+                    duration.innerText = entry.duration + "hrs";
+                    date_duration.appendChild(duration);
+                    entryContainer.appendChild(date_duration);
+                    description_tags = document.createElement("div");
+                    description_tags.classList.add("description-tags");
+                    if(entry.description === "No entry for " + entry.date){
+                        description_tags.classList.add("no-description")
+                    }
+                    description = document.createElement("p");
+                    description.classList.add("description");
+                    description.innerText = entry.description;
+                    description_tags.appendChild(description);
+                    tags = document.createElement("p");
+                    tags.classList.add("tags");
+                    for(var j = 0; j < entry.tags.length; j++){
+                        tag = document.createElement("span");
+                        tag.classList.add("tag");
+                        tag.innerText = entry.tags[j];
+                        tags.appendChild(tag);
+                    }
+                    description_tags.appendChild(tags);
+                    entryContainer.appendChild(description_tags);
+                    if(entry.loggedIn){
+                    	userLoggedIn = true;
+                    	displayAllTotals = true;
+                    	edit = document.createElement("div");
+                    	edit.classList.add("edit");
+                    	tempDate = entry.date.split('-');
+                    	currentDateSQLFormat = tempDate[2] + '-' + tempDate[1] + '-' + tempDate[0];
+                    	edit.setAttribute("onclick", "updateLog('" + currentDateSQLFormat + "', this)");
+                    	edit.innerHTML = '&#9998;';
+                    	entryContainer.appendChild(edit);
+                    	payAmount = document.createElement("div");
+                    	payAmount.classList.add("pay-amount");
+                    	payAmount.innerHTML = '&pound;' + entry.amount;
+                    	payAmountTotal += entry.amount;
+                    	entryContainer.appendChild(payAmount);
+                    	payStatus = document.createElement("div");
+                    	payStatus.classList.add("pay-status");
+                    	statusP = document.createElement("p");
+                    	
+                    	if(entry.status){
+                    		statusP.classList.add("payment-complete");
+                    		statusP.innerHTML = '&#10003;';
+                    		if(entry.description !== "No entry for " + entry.date)
+                    			statusP.setAttribute("onclick", "changePayStatus('" + currentDateSQLFormat + "' , 'FALSE', this)");
+                    	}else{
+                    		statusP.classList.add("payment-incomplete");
+                    		statusP.innerHTML = '&#9447;';
+                    		if(entry.description !== "No entry for " + entry.date)
+                    			statusP.setAttribute("onclick", "changePayStatus('" + currentDateSQLFormat + "' , 'TRUE', this)");
+                    		allPayComplete = false;
+                    	}
+                    	payStatus.appendChild(statusP);
+                    	entryContainer.appendChild(payStatus);
+                    }
+                    appendPoint.appendChild(entryContainer);
+                }
+                document.getElementById("hours-total").innerHTML += hoursTotal;
+                
+                if(userLoggedIn){
+                	addCss("css/log-style-2.css");
+                	headerSection = document.getElementById("log-headers");	
+                	header = document.createElement("div");
+                	header2 = document.createElement("div");
+                	header3 = document.createElement("div");
+                	header.classList.add("edit");
+                	header.innerText = "edit";
+                	headerSection.appendChild(header);
+                	header2.classList.add("pay-amount");
+                	header2.innerText = "pay";
+                	headerSection.appendChild(header2);
+                	header3.classList.add("pay-status");
+                	header3.innerText = "status";
+                	headerSection.appendChild(header3);
+                }
+                
+                if(displayAllTotals){
+                	totalsContainer = document.getElementById("log-totals");
+                	rateP = document.createElement("p");
+                	str = document.createElement("strong");
+                	str.innerText = "Rate:";
+                	rateP.appendChild(str);
+                	rateP.innerHTML += ' &pound;' + 12.00;
+                	totalsContainer.appendChild(rateP);
+                	payTotalP = document.createElement("p");
+                	payTotalP.id = "pay-total";
+                	str.innerText = "Week pay total:"
+                	payTotalP.appendChild(str);
+                	payTotalP.innerHTML += ' &pound;' + payAmountTotal;
+                	totalsContainer.appendChild(payTotalP);
+                	paidStatusWeek = document.createElement("p");
+                	paidStatusWeek.id = "paid-status-week";
+                	if(allPayComplete){
+                		paidStatusWeek.classList.add("payment-complete");
+                    	paidStatusWeek.innerHTML = '&#10003;';
+                    	paidStatusWeek.setAttribute("onclick", "changePayStatusWeek('" + currentDateSQLFormat + "' , 'FALSE')");
+                	}else{
+                		paidStatusWeek.classList.add("payment-incomplete");
+                		paidStatusWeek.innerHTML = '&#9447;';
+                		paidStatusWeek.setAttribute("onclick", "changePayStatusWeek('" + currentDateSQLFormat + "' , 'TRUE')");
+                	}
+                	totalsContainer.appendChild(paidStatusWeek);
+                	
+                }
+            }
+            
+            function addCss(fileName){
+            	var head = document.head;
+            	var link = document.createElement("link");
+            	link.type = "text/css";
+            	link.rel = "stylesheet";
+            	link.href = fileName;
+            	head.appendChild(link);
+            }
+            
+             loggedIn = new XMLHttpRequest();
+            loggedIn.open("Get", "/userLoggedIn" + window.location.search);
+            loggedIn.send();
+            loggedIn.onreadystatechange = function(){
+                if(loggedIn.readyState === 4 && loggedIn.status === 200){
+                    document.querySelector(".hidden").classList.remove("hidden");
+                }
+            }
+            
+            
+        
+    </script>
+    <script type="text/javascript" src="scripts/header.js"></script>
+    <script type="text/javascript" src="scripts/pay-status.js"></script>
+</body>
+</html>
+

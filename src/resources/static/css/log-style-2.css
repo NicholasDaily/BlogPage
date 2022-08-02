@@ -1,0 +1,74 @@
+.date-duration{
+  flex-basis: 15%;
+}
+
+.description-tags{
+  flex-basis: 50%;
+}
+
+.edit{
+  flex-grow: 5%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 25px;
+}
+
+.edit:hover{
+  cursor: pointer;
+}
+
+.pay-amount{
+  flex: 0 0 100px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  font-weight: bold;
+  color: #097969;
+}
+
+.pay-status{
+  flex-grow: 10%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.payment-complete{
+  color: #228B22;
+  font-weight: bold;
+  font-size: 25px;
+}
+
+.payment-complete:hover{
+  cursor: pointer;
+}
+
+.payment-incomplete{
+  color: #FF2400;
+  font-weight: bold;
+  font-size: 25px;
+}
+
+.payment-incomplete:hover{
+  cursor: pointer;
+}
+
+#log-totals{
+  display: flex;
+  justify-content: space-between;
+  
+}
+
+#paid-status-week{
+  align-self: flex-start;
+  margin-top: 10px;
+}
+
+.max-width-container, #wrapper{
+  max-width: 900px;
+}
+
+
