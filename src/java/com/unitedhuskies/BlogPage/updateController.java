@@ -45,8 +45,11 @@ public class updateController {
 	public ResponseEntity<?> logIn(@RequestParam Map<String, String> params) throws ParseException{
 		
 		 //check database for login info
-		String query = "SELECT * FROM users WHERE email = '" + params.get("email") + "';";
-		Map<String, Object> result = jdbcTemplate.queryForMap(query);
+		
+		String query = "SELECT * FROM users WHERE email = :email;";
+		Map<String, Object> result = jdbcTemplate2.queryForMap(query, new MapSqlParameterSource()
+				.addValue("email", params.get("email")));
+		
 		boolean userAuthenticated = params.get("password").equals(result.get("password"));
 		if(userAuthenticated) {
 			HttpHeaders responseHeaders = new HttpHeaders();
@@ -190,9 +193,10 @@ public class updateController {
 	}
 	
 	private Integer getTagId(String tag) {
-		String query = "SELECT id FROM log_tags WHERE tag = '" + tag + "';";
+		String query = "SELECT id FROM log_tags WHERE tag = :tag;";
 		try {
-			return jdbcTemplate.queryForObject(query, Integer.class);
+			return jdbcTemplate2.queryForObject(query, new MapSqlParameterSource()
+					.addValue("tag", tag), Integer.class);
 		}catch(EmptyResultDataAccessException e) {
 			return null;
 		}
@@ -291,8 +295,9 @@ public class updateController {
 			String sql = "SELECT users.name, active_sessions.expire_date "
 					+ "FROM users "
 					+ "INNER JOIN active_sessions ON users.id=active_sessions.user_id "
-					+ "WHERE active_sessions.session_id = '" + session_id + "';";
-			result = jdbcTemplate.queryForMap(sql);
+					+ "WHERE active_sessions.session_id = :sessionID";
+			 result = jdbcTemplate2.queryForMap(sql, new MapSqlParameterSource()
+					.addValue("sessionID", session_id));
 			user = (String) result.get("name");
 			System.out.println();
 			Date expires= Date.from(Instant.now());
