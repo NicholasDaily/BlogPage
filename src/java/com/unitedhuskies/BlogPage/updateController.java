@@ -18,7 +18,6 @@ import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.jdbc.support.rowset.SqlRowSet;
@@ -35,9 +34,7 @@ import java.time.temporal.TemporalAdjusters;
 @Controller
 public class updateController {
 	@Autowired
-	NamedParameterJdbcTemplate jdbcTemplate2;
-	@Autowired
-	JdbcTemplate jdbcTemplate;
+	NamedParameterJdbcTemplate jdbcTemplate;
 	@Autowired
 	ServletContext context;
 	
@@ -47,7 +44,7 @@ public class updateController {
 		 //check database for login info
 		
 		String query = "SELECT * FROM users WHERE email = :email;";
-		Map<String, Object> result = jdbcTemplate2.queryForMap(query, new MapSqlParameterSource()
+		Map<String, Object> result = jdbcTemplate.queryForMap(query, new MapSqlParameterSource()
 				.addValue("email", params.get("email")));
 		
 		boolean userAuthenticated = params.get("password").equals(result.get("password"));
@@ -65,8 +62,11 @@ public class updateController {
 			LocalDate expireDate = LocalDate.now();
 			String expireDateSQL = expireDate.plusDays(30).format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
 			String insert_session = "INSERT INTO active_sessions(session_id, user_id, expire_date) "
-								+ "VALUES('" + sessionId + "', " + result.get("id") + ", '" + expireDateSQL + "')";
-			jdbcTemplate.update(insert_session);
+								+ "VALUES(:sessionId, :id, :expireDateSQL)";
+			jdbcTemplate.update(insert_session, new MapSqlParameterSource()
+					.addValue("sessionId", sessionId)
+					.addValue("id", result.get("id"))
+					.addValue("expireDateSQL", expireDateSQL));
 			responseHeaders.add(HttpHeaders.SET_COOKIE, cookie.toString());
 			return new ResponseEntity<>(responseHeaders, HttpStatus.OK);
 		}else {
@@ -77,8 +77,9 @@ public class updateController {
 	@PostMapping("/logout")
 	public ResponseEntity<?> removeCookie(@CookieValue(name="session_id", defaultValue="") String cookie){
 		if(cookie.length() > 0) {
-			String remove_session = "DELETE FROM active_sessions WHERE session_id = '" + cookie + "'";
-			jdbcTemplate.update(remove_session);
+			String remove_session = "DELETE FROM active_sessions WHERE session_id = :cookie";
+			jdbcTemplate.update(remove_session, new MapSqlParameterSource()
+					.addValue("cookie", cookie));
 			ResponseCookie response = ResponseCookie.from("session_id", null).maxAge(0).build();
 			HttpHeaders responseHeaders = new HttpHeaders();
 			responseHeaders.add(HttpHeaders.SET_COOKIE, response.toString());
@@ -113,8 +114,9 @@ public class updateController {
 			
 			boolean updateHours = ((weekStart.isBefore(date)) || currentUser.equals("Tamino") || weekStart.equals(date));
 			boolean validEntry = (dateToday.equals(date) || date.isBefore(dateToday));
-			String query = "SELECT id FROM programming_log WHERE log_date = '" + date.format(yyyymmdd) + "';";
-			SqlRowSet results = jdbcTemplate.queryForRowSet(query);
+			String query = "SELECT id FROM programming_log WHERE log_date = :date;";
+			SqlRowSet results = jdbcTemplate.queryForRowSet(query, new MapSqlParameterSource()
+					.addValue("date", date.format(yyyymmdd)));
 			entryExisting = results.next();
 			System.out.println("existing?: " + entryExisting);
 			
@@ -122,14 +124,14 @@ public class updateController {
 				if(updateHours) {
 					query = "UPDATE programming_log "
 							+ "SET description = :description, duration = :hours WHERE log_date = :date;";
-					jdbcTemplate2.update(query, new MapSqlParameterSource()
+					jdbcTemplate.update(query, new MapSqlParameterSource()
 							.addValue("description", description)
 							.addValue("hours", hours)
 							.addValue("date", date.format(yyyymmdd)));
 				}else {
 					query = "UPDATE programming_log "
 							+ "SET description = :description WHERE log_date = :date;";
-					jdbcTemplate2.update(query, new MapSqlParameterSource()
+					jdbcTemplate.update(query, new MapSqlParameterSource()
 							.addValue("description", description)
 							.addValue("date", date.format(yyyymmdd)));
 				}
@@ -137,7 +139,7 @@ public class updateController {
 				if(updateHours) {
 					query = "INSERT INTO programming_log(log_date, description, duration, rate, paid) "
 							+ "VALUES(:date, :description, :duration, :rate, :paid);";
-					jdbcTemplate2.update(query, new MapSqlParameterSource()
+					jdbcTemplate.update(query, new MapSqlParameterSource()
 							.addValue("date", date.format(yyyymmdd)) 
 							.addValue("description", description)
 							.addValue("duration", hours)
@@ -147,7 +149,7 @@ public class updateController {
 				}else {
 					query = "INSERT INTO programming_log(log_date, description, rate, paid) "
 							+ "VALUES(:date, :description, :rate, :paid);";
-					jdbcTemplate2.update(query, new MapSqlParameterSource()
+					jdbcTemplate.update(query, new MapSqlParameterSource()
 							.addValue("date", date.format(yyyymmdd)) 
 							.addValue("description", description)
 							.addValue("rate", rate)
@@ -156,12 +158,12 @@ public class updateController {
 			}else {
 				return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
 			}
-			query = "SELECT id FROM programming_log WHERE log_date = '" + date.format(yyyymmdd) + "';";
-			Integer logId = jdbcTemplate.queryForObject(query, Integer.class);
+			query = "SELECT id FROM programming_log WHERE log_date = :date;";
+			Integer logId = jdbcTemplate.queryForObject(query, new MapSqlParameterSource().addValue("date", date.format(yyyymmdd)), Integer.class);
 			
 			if(entryExisting) {
 				query = "DELETE FROM log_to_tag WHERE log_id = :logId;";
-				jdbcTemplate2.update(query, new MapSqlParameterSource()
+				jdbcTemplate.update(query, new MapSqlParameterSource()
 						.addValue("logId", logId.intValue()));
 				
 			}
@@ -173,12 +175,14 @@ public class updateController {
 						tagId = getTagId(tag);
 						if(tagId == null) {
 							query = "INSERT INTO log_tags(tag) VALUES(:tag);";
-							jdbcTemplate2.update(query, new MapSqlParameterSource()
+							jdbcTemplate.update(query, new MapSqlParameterSource()
 									.addValue("tag", tag));
 							tagId = getTagId(tag);
 						}
-						query = "INSERT INTO log_to_tag(log_id, tag_id) VALUES(" + logId + ", " + tagId + ");";
-						jdbcTemplate.update(query);
+						query = "INSERT INTO log_to_tag(log_id, tag_id) VALUES(:logId, :tagId);";
+						jdbcTemplate.update(query, new MapSqlParameterSource()
+								.addValue("logId", logId.intValue())
+								.addValue("tagId", tagId.intValue()));
 					}
 						
 				}
@@ -195,7 +199,7 @@ public class updateController {
 	private Integer getTagId(String tag) {
 		String query = "SELECT id FROM log_tags WHERE tag = :tag;";
 		try {
-			return jdbcTemplate2.queryForObject(query, new MapSqlParameterSource()
+			return jdbcTemplate.queryForObject(query, new MapSqlParameterSource()
 					.addValue("tag", tag), Integer.class);
 		}catch(EmptyResultDataAccessException e) {
 			return null;
@@ -216,40 +220,124 @@ public class updateController {
 		return sessionId.toString();
 	}
 	
+	/*[{
+	 * "PostID": postid,
+	 * "items":[
+	 * {"type":2,
+	 *  "content":"/getImg?file=filename.png"},
+	 *  {"type":1,
+	 *  "content:"aegrarhegra""
+	 *  },
+	 *  {
+	 *  "type":3
+	 *  "content":"/getFile?file=filename.txt"
+	 *  }
+	 * ]
+	 * }]*/
+	
 	@PostMapping("/validatePost")
 	public ResponseEntity<?> validatePost(@RequestParam(
 			name="upload-file") MultipartFile[] files,
 			@RequestParam(name="upload-image") MultipartFile[] images,
-			@RequestParam(name="post-text") String text){
+			@RequestParam(name="post-text") String text,
+			@CookieValue(name="session_id", defaultValue="") String cookie){
+		String json = "";
 		try {
-			if(!(files[0].getOriginalFilename().length() == 0)) {
-				for(int i = 0; i < files.length; i++) {
-					File path = new File("/home/javahusky/resources/files/", files[i].getOriginalFilename());
-					FileOutputStream output = new FileOutputStream(path);
-					output.write(files[i].getBytes());
-					output.close();
+			String activeUser = getActiveUser(cookie);
+			json += "[{";
+			if(activeUser.length() > 0) {
+				LocalDate date = LocalDate.now();
+				String sql = "SELECT id FROM users WHERE name = :activeUser;";
+				int id = jdbcTemplate.queryForObject(sql, 
+						new MapSqlParameterSource().addValue("activeUser", activeUser) ,Integer.class);
+				String query = "INSERT INTO blog_posts(user_id, date) VALUES(:userId, :date);";
+				jdbcTemplate.update(query, new MapSqlParameterSource()
+						.addValue("userId", id)
+						.addValue("date", date.toString()));
+				int postId = jdbcTemplate.queryForObject("SELECT MAX(id) FROM blog_posts ", new MapSqlParameterSource(), Integer.class);
+				json += "\"PostID\":" + postId + ",";
+				json += "\"items\":[";
+				query = "INSERT INTO blog_content(blog_post_id, type, content) VALUES(:blog_post_id, :type, :content);";
+				if(!(files[0].getOriginalFilename().length() == 0)) {
+					for(int i = 0; i < files.length; i++) {
+						String filePath = "/volumes/azurefile/home/javahusky/resources/files/";
+						String fileName = files[i].getOriginalFilename();
+						File file = new File(filePath + fileName);
+						int num = 1;
+						while(file.exists()) {
+							String[] fileNameParts = files[i].getOriginalFilename().split("\\."); 
+							System.out.println("Name: " + files[i].getOriginalFilename());
+							System.out.println("Parts: " + Arrays.toString(files[i].getOriginalFilename().split(".")));
+							
+							fileName = fileNameParts[0] + "(" + num + ")." + fileNameParts[fileNameParts.length - 1];
+							file = new File(filePath + fileName);
+							num++;
+						}
+						FileOutputStream output = new FileOutputStream(file);
+						output.write(files[i].getBytes());
+						output.close();
+						jdbcTemplate.update(query, new MapSqlParameterSource()
+								.addValue("blog_post_id", postId) 
+								.addValue("type", 3)
+								.addValue("content", "files/" + fileName));
+						json += "{";
+						json += "\"type\":3,";
+						json += "\"content\":\"/getFile?file=" + jsonEntities(fileName) + "\"";
+						json += "},";
+						
+					}
 				}
-			}
-			if(!(images[0].getOriginalFilename().length() == 0)) {
-				for(int i = 0; i < images.length; i++) {
-					System.out.println(images[i].getOriginalFilename());
-					String[] fileNameSections = images[i].getOriginalFilename().split("[.]");
-					System.out.println(Arrays.toString(fileNameSections));
-					String fileExtention = '.' + fileNameSections[fileNameSections.length - 1];
-					String newFileName = generateRandomString(15) + fileExtention;
-					File path = new File("/home/javahusky/resources/images/", newFileName);
-					FileOutputStream output = new FileOutputStream(path);
-					output.write(images[i].getBytes());
-					output.close();
-					System.out.println(newFileName);
+				if(!(images[0].getOriginalFilename().length() == 0)) {
+					for(int i = 0; i < images.length; i++) {
+						System.out.println(images[i].getOriginalFilename());
+						String[] fileNameSections = images[i].getOriginalFilename().split("\\.");
+						System.out.println(Arrays.toString(fileNameSections));
+						String fileExtention = '.' + fileNameSections[fileNameSections.length - 1];
+						String newFileName = generateRandomString(15) + fileExtention;
+						String filePath = "/volumes/azurefile/home/javahusky/resources/images/";
+						File path = new File(filePath + newFileName);
+						while(path.exists()) {
+							newFileName = generateRandomString(15) + fileExtention;
+							path = new File(filePath + newFileName);
+						}
+						FileOutputStream output = new FileOutputStream(path);
+						output.write(images[i].getBytes());
+						output.close();
+						System.out.println(newFileName);
+						jdbcTemplate.update(query, new MapSqlParameterSource()
+								.addValue("blog_post_id", postId) 
+								.addValue("type", 2)
+								.addValue("content", "img/" + newFileName));
+						json += "{";
+						json += "\"type\":2,";
+						json += "\"content\":\"/getImg?file=" + jsonEntities(newFileName) + "\"";
+						json += "},";
+					}
 				}
+				if(text.length() > 0) {
+					jdbcTemplate.update(query, new MapSqlParameterSource()
+							.addValue("blog_post_id", postId) 
+							.addValue("type", 1)
+							.addValue("content", text));
+					json += "{";
+					json += "\"type\":1,";
+					json += "\"content\":\"" + jsonEntities(text) + "\"";
+					json += "},";
+				}
+				System.out.println("JSON BEFORE: " + json);
+				json = json.substring(0, json.length() - 1) + "]";
+				System.out.println("JSON AFTER: " + json);
+			    json += "}]";
+			    
 			}
 			
 		}catch(Exception e) {
 			e.printStackTrace();
 			return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
 		}
-		return new ResponseEntity<>(HttpStatus.OK);
+		HttpHeaders responseHeaders = new HttpHeaders();
+		responseHeaders.setContentType(MediaType.APPLICATION_JSON);
+		return new ResponseEntity<>(json, responseHeaders, HttpStatus.OK);
 	}
 	
 	@PostMapping("/updatePayStatus")
@@ -264,7 +352,7 @@ public class updateController {
 				LocalDate weekStart = date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
 				LocalDate weekEnd = date.with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY));
 				String query = "UPDATE programming_log SET paid = :value WHERE log_date BETWEEN :weekStart AND :weekEnd;";
-				int rowsEffected = jdbcTemplate2.update(query, new MapSqlParameterSource()
+				int rowsEffected = jdbcTemplate.update(query, new MapSqlParameterSource()
 						.addValue("value", value)
 						.addValue("weekStart", weekStart.format(yyyymmdd))
 						.addValue("weekEnd", weekEnd.format(yyyymmdd)));
@@ -275,7 +363,7 @@ public class updateController {
 				
 			}else {
 				String query = "UPDATE programming_log SET paid = :value WHERE log_date = :date;";
-				int rowsEffected = jdbcTemplate2.update(query, new MapSqlParameterSource()
+				int rowsEffected = jdbcTemplate.update(query, new MapSqlParameterSource()
 						.addValue("value", value)
 						.addValue("date", date.format(yyyymmdd)));
 				if(rowsEffected > 0)
@@ -296,7 +384,7 @@ public class updateController {
 					+ "FROM users "
 					+ "INNER JOIN active_sessions ON users.id=active_sessions.user_id "
 					+ "WHERE active_sessions.session_id = :sessionID";
-			 result = jdbcTemplate2.queryForMap(sql, new MapSqlParameterSource()
+			 result = jdbcTemplate.queryForMap(sql, new MapSqlParameterSource()
 					.addValue("sessionID", session_id));
 			user = (String) result.get("name");
 			System.out.println();
@@ -312,5 +400,14 @@ public class updateController {
 		
 		return user;
 		
+	}
+	
+	private String jsonEntities(String json) {
+		json = json.replaceAll("\\\\", "\\\\\\\\");
+		json = json.replaceAll("\"", "\\\\\"");
+		json = json.replaceAll("\\n", "\\\\n");
+		json = json.replaceAll("\\r", "\\\\r");
+		json = json.replaceAll("\\t", "\\\\t");
+		return json;
 	}
 }

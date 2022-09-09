@@ -3,40 +3,27 @@ package com.unitedhuskies.BlogPage;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-
-import javax.servlet.http.HttpServletRequest;
-
-import org.apache.tomcat.util.http.fileupload.IOUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataAccessException;
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.MediaTypeFactory;
 import org.springframework.http.ResponseCookie;
-import org.springframework.http.ResponseCookie.ResponseCookieBuilder;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.ResponseBody;
-import org.springframework.web.servlet.config.annotation.ViewControllerRegistry;
-import org.springframework.web.util.WebUtils;
-import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.jdbc.support.rowset.SqlRowSet;
-
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.file.Files;
-import java.nio.file.Path;
-import java.sql.Time;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.time.DayOfWeek;
@@ -49,18 +36,25 @@ import java.time.temporal.TemporalAdjusters;
 @Controller
 public class RetrieveController {
 	@Autowired
-	JdbcTemplate jdbcTemplate;
+	NamedParameterJdbcTemplate jdbcTemplate;
 	
 	@GetMapping("/getPosts")
 	public ResponseEntity<String> getPosts(@RequestParam Map<String, String> params){
 		String json = "";
 		String query = "";
+		
+		SqlRowSet result;
 		if(params.get("has_posts").equals("true")) {
-			query = "SELECT id from blog_posts WHERE id < " + params.get("post_id") + " ORDER BY id DESC LIMIT " + params.get("post_limit") + ";";
+			query = "SELECT id from blog_posts WHERE id < :postId ORDER BY id DESC LIMIT :postLimit;";
+			result = jdbcTemplate.queryForRowSet(query, new MapSqlParameterSource()
+					.addValue("postId", Integer.parseInt(params.get("post_id")))
+					.addValue("postLimit", Integer.parseInt(params.get("post_limit"))));
 		}else {
-			query = "SELECT id from blog_posts ORDER BY id DESC LIMIT " + params.get("post_limit") + ";";
+			query = "SELECT id from blog_posts ORDER BY id DESC LIMIT :postLimit";
+			result = jdbcTemplate.queryForRowSet(query, new MapSqlParameterSource()
+					.addValue("postLimit", Integer.parseInt(params.get("post_limit"))));
 		}
-		SqlRowSet result = jdbcTemplate.queryForRowSet(query);
+		 
 		json += "[";
 		boolean hasPosts = false;
 		while(result.next()) {
@@ -69,15 +63,19 @@ public class RetrieveController {
 			json += "{";
 			json += "\"PostID\":" + post_id + ",";
 			json += "\"items\":[";
-			SqlRowSet post_content = jdbcTemplate.queryForRowSet("SELECT * FROM blog_content WHERE blog_post_id = " + post_id + ";");
+			query = "SELECT * FROM blog_content WHERE blog_post_id = :postId;";
+			SqlRowSet post_content = jdbcTemplate.queryForRowSet(query, new MapSqlParameterSource()
+					.addValue("postId", post_id));
 			boolean noContent = true;
 			while(post_content.next()) {
 				noContent = false;
 				int type = post_content.getInt("type");
 				String content = post_content.getString("content");
-				if(content.contains("/")) {
-					String[] contentSegments = content.split("/");
-					content = contentSegments[contentSegments.length - 1];
+				if(type == 2 || type == 3) {
+					if(content.contains("/")) {
+						String[] contentSegments = content.split("/");
+						content = contentSegments[contentSegments.length - 1];
+					}
 				}
 				if(type == 2) 
 					content = "/getImg?file=" + content;
@@ -116,10 +114,11 @@ public class RetrieveController {
 		LocalDate date = Instant.ofEpochMilli(new SimpleDateFormat("yyyy-MM-dd").parse(dateString).getTime()).atZone(ZoneId.systemDefault()).toLocalDate();
 		LocalDate mon = date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
 		LocalDate sun = date.with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY));
-		String query = "SELECT * FROM programming_log WHERE log_date BETWEEN ";
-		query += "'" + mon.format(yyyymmdd) + "' AND '" + sun.format(yyyymmdd) + "' ";
-		query += "ORDER BY log_date ASC;";
-		SqlRowSet results = jdbcTemplate.queryForRowSet(query);
+		String query = "SELECT * FROM programming_log WHERE log_date BETWEEN "
+		 + ":date_start AND :date_end ORDER BY log_date ASC;";
+		SqlRowSet results = jdbcTemplate.queryForRowSet(query, new MapSqlParameterSource()
+				.addValue("date_start", mon.format(yyyymmdd))
+				.addValue("date_end", sun.format(yyyymmdd)));
 		boolean endReached = false;
 		if(!results.next()) {
 			endReached = true;
@@ -156,8 +155,9 @@ public class RetrieveController {
 						+ "FROM log_to_tag\n"
 						+ "INNER JOIN log_tags ON log_to_tag.tag_id=log_tags.id\n"
 						+ "INNER JOIN programming_log ON log_to_tag.log_id=programming_log.id\n"
-						+ "WHERE programming_log.id = " + logId;
-				SqlRowSet tagResults = jdbcTemplate.queryForRowSet(tagQuery);
+						+ "WHERE programming_log.id = :logId;";
+				SqlRowSet tagResults = jdbcTemplate.queryForRowSet(tagQuery, new MapSqlParameterSource()
+						.addValue("logId", logId));
 				while(tagResults.next()) {
 					tags.add(tagResults.getString("tag"));
 				}
@@ -200,8 +200,9 @@ public class RetrieveController {
 			String sql = "SELECT users.name, active_sessions.expire_date "
 					+ "FROM users "
 					+ "INNER JOIN active_sessions ON users.id=active_sessions.user_id "
-					+ "WHERE active_sessions.session_id = '" + session_id + "';";
-			result = jdbcTemplate.queryForMap(sql);
+					+ "WHERE active_sessions.session_id = :session_id;";
+			result = jdbcTemplate.queryForMap(sql, new MapSqlParameterSource()
+					.addValue("session_id", session_id));
 			user = (String) result.get("name");
 			System.out.println();
 			Date expires= Date.from(Instant.now());
@@ -217,27 +218,6 @@ public class RetrieveController {
 		return user;
 		
 	}
-
-	@GetMapping("/setCookie")
-	public ResponseEntity<?> setCookie(){
-		ResponseCookie cookie = ResponseCookie.from("Yiff", "true")
-		.httpOnly(true)
-		.secure(false)
-		.path("/")
-		.maxAge(60 * 5)
-		.build();
-		HttpHeaders responseHeaders = new HttpHeaders();
-		responseHeaders.add(HttpHeaders.SET_COOKIE, cookie.toString());
-		return new ResponseEntity<>(responseHeaders, HttpStatus.OK);
-	}
-	
-	@GetMapping("/removeCookie")
-	public ResponseEntity<?> removeCookie(){
-		ResponseCookie cookie = ResponseCookie.from("yiff", null).build();
-		HttpHeaders responseHeaders = new HttpHeaders();
-		responseHeaders.add(HttpHeaders.SET_COOKIE, cookie.toString());
-		return new ResponseEntity<>(responseHeaders, HttpStatus.OK);
-	}
 	
 	private String jsonEntities(String json) {
 		json = json.replaceAll("\\\\", "\\\\\\\\");
@@ -251,8 +231,8 @@ public class RetrieveController {
 	@GetMapping("/getDownloads")
 	public ResponseEntity<String> getDownloads(){
 		String json = "{\"links\":[";
-		
-		SqlRowSet response = jdbcTemplate.queryForRowSet("SELECT * FROM blog_content WHERE type = 3 ORDER BY id DESC");
+		String sql = "SELECT * FROM blog_content WHERE type = 3 ORDER BY id DESC";
+		SqlRowSet response = jdbcTemplate.queryForRowSet(sql, new MapSqlParameterSource());
 		
 		while(response.next()) {
 			String content = response.getString("content");
@@ -271,6 +251,24 @@ public class RetrieveController {
 		return new ResponseEntity<String>(json, responseHeaders, HttpStatus.OK);
 	}
 	
+	@GetMapping("/getApps")
+	public ResponseEntity<String> getApps(){
+		String json = "{\"links\":[";
+		String sql = "SELECT * FROM online_apps ORDER BY id DESC";
+		SqlRowSet response = jdbcTemplate.queryForRowSet(sql, new MapSqlParameterSource());
+		
+		while(response.next()) {
+			String content = response.getString("src");
+			content = "/online-apps/" + content;
+			json += "\"" + content + "\", ";
+		}
+		
+		json = json.substring(0, json.length() - 2) + "]}";;
+		
+		HttpHeaders responseHeaders = new HttpHeaders();
+		responseHeaders.setContentType(MediaType.APPLICATION_JSON);
+		return new ResponseEntity<String>(json, responseHeaders, HttpStatus.OK);
+	}
 	
 	@GetMapping("/userLoggedIn")
 	public ResponseEntity<?> userLoggedIn(@CookieValue(name="session_id", defaultValue="") String session_id) throws DataAccessException, ParseException{
@@ -283,8 +281,10 @@ public class RetrieveController {
 			String sql = "SELECT users.name, active_sessions.expire_date "
 					+ "FROM users "
 					+ "INNER JOIN active_sessions ON users.id=active_sessions.user_id "
-					+ "WHERE active_sessions.session_id = '" + session_id + "';";
-			result = jdbcTemplate.queryForMap(sql);
+					+ "WHERE active_sessions.session_id = :session_id;";
+			try {
+			result = jdbcTemplate.queryForMap(sql, new MapSqlParameterSource()
+					.addValue("session_id", session_id));
 			user = (String) result.get("name");
 			System.out.println();
 			Date expires= Date.from(Instant.now());
@@ -295,6 +295,10 @@ public class RetrieveController {
 			}else if(15 >= Math.abs(today.compareTo(expires))) {
 				updateCookie = true;
 			}
+			}catch(EmptyResultDataAccessException e) {
+				user = null;
+			}
+			
 		}else {
 			user = null;
 		}
@@ -315,16 +319,19 @@ public class RetrieveController {
 				c.add(Calendar.DATE, 30);
 				String expireDateSQL = sqlFormatDate.format(c.getTime());
 				String insert_session = "UPDATE active_sessions "
-						+ "SET expire_date = \"" + expireDateSQL + "\" "
-						+ "WHERE session_id = \"" + session_id + "\"";
-				jdbcTemplate.update(insert_session);
+						+ "SET expire_date = :expireDateSQL "
+						+ "WHERE session_id = :session_id;";
+				jdbcTemplate.update(insert_session, new MapSqlParameterSource()
+						.addValue("expireDateSQL", expireDateSQL)
+						.addValue("session_id", session_id));
 				responseHeaders.add(HttpHeaders.SET_COOKIE, cookie.toString());
 			}
 			status = HttpStatus.OK;
 		}else {
 			if(session_id.length() > 0) {
-				String remove_session = "DELETE FROM active_sessions WHERE session_id = '" + session_id + "'";
-				jdbcTemplate.update(remove_session);
+				String remove_session = "DELETE FROM active_sessions WHERE session_id = :session_id";
+				jdbcTemplate.update(remove_session, new MapSqlParameterSource()
+						.addValue("session_id", session_id));
 				ResponseCookie response = ResponseCookie.from("session_id", null).maxAge(0).build();
 				responseHeaders.add(HttpHeaders.SET_COOKIE, response.toString());
 			}
@@ -340,7 +347,8 @@ public class RetrieveController {
 			HttpHeaders responseHeaders = new HttpHeaders();
 			Optional<MediaType> mediaType = MediaTypeFactory.getMediaType(fileName);
 			String dir;
-			dir = "/home/javahusky/resources/images/";
+			
+			dir = "/volumes/azurefile/home/javahusky/resources/images/";
 			System.out.println("MediaType: " + mediaType.get());
 			String path = dir + fileName;
 			System.out.println("Path: " + path);
@@ -360,7 +368,7 @@ public class RetrieveController {
 			HttpHeaders responseHeaders = new HttpHeaders();
 			Optional<MediaType> mediaType = MediaTypeFactory.getMediaType(fileName);
 			String dir;
-			dir = "/home/javahusky/resources/files/";
+			dir = "/volumes/azurefile/home/javahusky/resources/files/";
 			System.out.println("MediaType: " + mediaType.get());
 			String path = dir + fileName;
 			System.out.println("Path: " + path);
