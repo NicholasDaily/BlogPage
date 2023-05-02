@@ -1,4 +1,4 @@
-package com.unitedhuskies.BlogPage;
+package com.nicholasDaily.blogpage;
 
 import java.util.ArrayList;
 import java.util.Calendar;

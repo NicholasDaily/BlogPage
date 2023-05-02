@@ -1,4 +1,4 @@
-package com.unitedhuskies.BlogPage;
+package com.nicholasDaily.blogpage;
 
 import java.util.Arrays;
 import java.util.Date;
@@ -35,8 +35,6 @@ import java.time.temporal.TemporalAdjusters;
 public class updateController {
 	@Autowired
 	NamedParameterJdbcTemplate jdbcTemplate;
-	@Autowired
-	ServletContext context;
 	
 	@PostMapping("/login")
 	public ResponseEntity<?> logIn(@RequestParam Map<String, String> params) throws ParseException{
